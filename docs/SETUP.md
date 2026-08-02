@@ -40,14 +40,29 @@ device answers `/api/*` fine but serves a 404 at `/`, i.e. the URL on the displa
 nothing. Serial says `[net] LittleFS mount failed — run 'pio run -t uploadfs'` when this
 has happened. Re-run `uploadfs` on its own any time you edit `webapp/`.
 
-## 3. First boot — setup portal
+## 3. First boot — two ways to provision
 
-With no Wi-Fi credentials stored, the device starts a SoftAP:
+With no Wi-Fi credentials stored, `setup()` first listens on the same USB-serial port for
+20 seconds, then — if nothing arrived — falls back to a SoftAP.
+
+**A — USB serial (used by `webflash/`, no second Wi-Fi network to join).** Any tool holding the
+port open can send one line: a JSON object ending in `\n`, e.g.
+`{"wifi_ssid":"home","wifi_pass":"...","device_pin":"1234"}` (`wifi_ssid` is the only required
+field). The device replies with one of `>>>PROVISION_OK`, `>>>PROVISION_ERR:<reason>`, or —
+after 20 s of silence — `>>>PROVISION_TIMEOUT`, then falls through to the SoftAP below. This is
+exactly what the "Connect" + form on the flashing page does; a plain serial terminal (e.g.
+`pio device monitor`, minicom, PuTTY) works the same way if you type the JSON line yourself
+within the window.
+
+**B — SoftAP captive portal:**
 
 1. Join Wi-Fi network **`deskbuddy-setup`**.
 2. Open `http://192.168.4.1`.
 3. Fill in: Wi-Fi SSID + password, and a **device PIN** (this is the only thing standing between your camera and everyone else on your LAN — set it).
 4. Save. The device reboots and joins your network.
+
+Either path writes the same NVS fields via `settingsApplyJson()` (`storage.cpp`) — there is one
+validator, not two.
 
 On every boot after that, the **Status screen shows the device URL for 30 seconds**. That URL (or `http://deskbuddy.local`) is what you open. Note it down once — it's also on your router's DHCP table.
 

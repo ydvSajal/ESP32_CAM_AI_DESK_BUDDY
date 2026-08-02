@@ -7,26 +7,52 @@
   body{font:16px/1.5 system-ui;margin:0;padding:0;background:#0f1115;color:#e8e8e8}
   main{max-width:640px;margin:0 auto;padding:48px 24px}
   h1{font-size:22px;margin:0 0 4px}
+  h2{font-size:16px;margin:0 0 12px;color:#c7c9d1}
   p.sub{color:#9ca3af;margin-top:0}
   .card{background:#1a1d24;border:1px solid #2a2e38;border-radius:12px;padding:24px;margin:20px 0}
+  .step{display:flex;align-items:center;gap:8px;font-size:13px;color:#6b7280;margin-bottom:16px}
+  .step b{color:#e8e8e8}
   esp-web-install-button{display:block}
-  esp-web-install-button button{
-    width:100%;padding:16px;font:600 16px system-ui;background:#3b82f6;color:#fff;
-    border:0;border-radius:8px;cursor:pointer}
-  esp-web-install-button button:hover{background:#2563eb}
+  esp-web-install-button button, .btn{
+    width:100%;padding:14px;font:600 15px system-ui;background:#3b82f6;color:#fff;
+    border:0;border-radius:8px;cursor:pointer;box-sizing:border-box}
+  esp-web-install-button button:hover, .btn:hover{background:#2563eb}
+  .btn.secondary{background:#2a2e38}
+  .btn.secondary:hover{background:#343945}
+  .btn:disabled{background:#2a2e38;color:#6b7280;cursor:not-allowed}
+  .row{display:flex;gap:10px}
+  .row .btn{flex:1}
   ol{padding-left:20px;color:#c7c9d1}
   li{margin:6px 0}
   code{background:#2a2e38;padding:2px 6px;border-radius:4px;font-size:14px}
-  .warn{color:#f59e0b;font-size:14px;margin-top:16px}
+  .warn{color:#f59e0b;font-size:14px}
   .support{font-size:13px;color:#6b7280;margin-top:8px}
   a{color:#60a5fa}
   footer{color:#6b7280;font-size:13px;margin-top:32px}
+
+  #term{background:#000;color:#4ade80;font:13px/1.5 ui-monospace,Consolas,monospace;
+    border-radius:8px;padding:12px;height:200px;overflow-y:auto;white-space:pre-wrap;
+    word-break:break-all;margin-bottom:14px;border:1px solid #2a2e38}
+  #status{font-size:13px;padding:8px 12px;border-radius:6px;margin-bottom:14px;display:none}
+  #status.ok{display:block;background:#052e16;color:#4ade80;border:1px solid #14532d}
+  #status.bad{display:block;background:#2d0a0a;color:#f87171;border:1px solid #7f1d1d}
+  #status.wait{display:block;background:#1e2530;color:#93c5fd;border:1px solid #1e3a5f}
+
+  form.creds{display:grid;gap:10px;margin-top:14px}
+  form.creds label{font-size:12px;color:#9ca3af;display:block;margin-bottom:3px}
+  form.creds input,form.creds select{
+    width:100%;box-sizing:border-box;padding:9px 10px;font:14px system-ui;
+    background:#12141a;color:#e8e8e8;border:1px solid #2a2e38;border-radius:6px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  fieldset{border:0;padding:0;margin:0}
+  legend{font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin:8px 0 4px;padding:0}
 </style>
 <main>
   <h1>Flash Desk Buddy</h1>
-  <p class="sub">ESP32-S3 firmware + web app, straight from this page. No PlatformIO, no CLI.</p>
+  <p class="sub">ESP32-S3 firmware + web app + Wi-Fi setup, all from this page. No PlatformIO, no CLI, no second Wi-Fi network to join.</p>
 
   <div class="card">
+    <div class="step"><b>Step 1</b> — Flash the firmware</div>
     <ol>
       <li>Plug the board in over USB-C.</li>
       <li>Click install below, pick the serial port when Chrome asks.</li>
@@ -37,9 +63,161 @@
     <p class="support">Works in Chrome / Edge on desktop (Web Serial API). Not Firefox, not Safari, not mobile.</p>
   </div>
 
-  <p class="warn">First boot: join the <code>deskbuddy-setup</code> Wi-Fi network from your phone,
-    open <code>http://192.168.4.1</code>, and enter your Wi-Fi + a device PIN. The device reboots
-    and shows its URL on its own screen from then on.</p>
+  <div class="card">
+    <div class="step"><b>Step 2</b> — Send Wi-Fi + keys over the same USB cable</div>
+    <p class="support" style="margin-top:0">
+      Fill the form below <i>first</i>, then press the board's <b>RESET</b> button, then click
+      <b>Connect</b> within a few seconds and <b>Send</b>. A fresh device listens on USB for
+      about 20&nbsp;seconds after boot before it falls back to its own <code>deskbuddy-setup</code>
+      Wi-Fi hotspot — this is the alternative to joining that hotspot by hand.
+    </p>
+
+    <div id="status"></div>
+    <pre id="term">Not connected.</pre>
+
+    <div class="row">
+      <button class="btn" id="btn-connect">Connect</button>
+      <button class="btn secondary" id="btn-disconnect" disabled>Disconnect</button>
+    </div>
+
+    <form class="creds" id="creds">
+      <fieldset>
+        <legend>Wi-Fi (required)</legend>
+        <div class="two">
+          <div><label>SSID</label><input name="wifi_ssid" required maxlength="32"></div>
+          <div><label>Password</label><input name="wifi_pass" type="password" maxlength="63"></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Device</legend>
+        <div class="two">
+          <div><label>Device PIN (4–12 chars, blank = no auth)</label><input name="device_pin" maxlength="12"></div>
+          <div><label>Timezone offset (minutes, e.g. 330 = IST)</label><input name="tz_offset_min" type="number" value="0"></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>AI (optional — either key alone is enough)</legend>
+        <div class="two">
+          <div><label>OpenRouter key</label><input name="openrouter_key" type="password"></div>
+          <div><label>Gemini key</label><input name="gemini_key" type="password"></div>
+        </div>
+        <label>Provider</label>
+        <select name="ai_provider"><option value="openrouter">openrouter</option><option value="gemini">gemini</option></select>
+      </fieldset>
+      <button class="btn" id="btn-send" type="submit" disabled>Send over USB</button>
+    </form>
+  </div>
+
+  <p class="warn">Google Drive credentials aren't part of first-boot setup — add those later from
+    the device's own web app (it's served at the URL shown on its screen). See
+    <a href="https://github.com/ydvSajal/ESP32_CAM_AI_DESK_BUDDY/blob/main/docs/get_drive_token.md" target="_blank" rel="noopener">get_drive_token.md</a>.</p>
 
   <footer>Source: <a href="https://github.com/ydvSajal/ESP32_CAM_AI_DESK_BUDDY" target="_blank" rel="noopener">ESP32_CAM_AI_DESK_BUDDY</a></footer>
 </main>
+
+<script>
+(function () {
+  var termEl = document.getElementById('term');
+  var statusEl = document.getElementById('status');
+  var connectBtn = document.getElementById('btn-connect');
+  var disconnectBtn = document.getElementById('btn-disconnect');
+  var sendBtn = document.getElementById('btn-send');
+  var form = document.getElementById('creds');
+
+  var port = null, reader = null, writer = null, keepReading = false, lineBuf = '';
+
+  function log(s) {
+    termEl.textContent += s;
+    termEl.scrollTop = termEl.scrollHeight;
+  }
+  function status(kind, text) {
+    statusEl.className = kind;
+    statusEl.textContent = text;
+  }
+
+  // Watches decoded serial text for the firmware's >>>PROVISION_* markers (main.cpp).
+  function feedLine(line) {
+    if (line.indexOf('>>>PROVISION_READY') !== -1) status('wait', 'Device is listening — click Send now.');
+    else if (line.indexOf('>>>PROVISION_OK') !== -1) status('ok', 'Saved. Device is rebooting onto your Wi-Fi.');
+    else if (line.indexOf('>>>PROVISION_TIMEOUT') !== -1) status('bad', 'Window closed — press RESET and try again.');
+    else if (line.indexOf('>>>PROVISION_ERR:') !== -1) status('bad', line.split('>>>PROVISION_ERR:')[1] || 'Rejected by the device.');
+  }
+
+  if (!('serial' in navigator)) {
+    connectBtn.disabled = true;
+    status('bad', 'This browser has no Web Serial API. Use Chrome or Edge on desktop.');
+  }
+
+  connectBtn.onclick = async function () {
+    try {
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+    } catch (e) {
+      status('bad', 'Could not open the port: ' + e.message);
+      return;
+    }
+    termEl.textContent = '';
+    keepReading = true;
+    connectBtn.disabled = true;
+    disconnectBtn.disabled = false;
+    sendBtn.disabled = false;
+    writer = port.writable.getWriter();
+    status('wait', 'Connected. Waiting for the device to boot / reset...');
+    readLoop();
+  };
+
+  async function readLoop() {
+    var decoder = new TextDecoder();
+    reader = port.readable.getReader();
+    try {
+      while (keepReading) {
+        var r = await reader.read();
+        if (r.done) break;
+        var text = decoder.decode(r.value, { stream: true });
+        log(text);
+        lineBuf += text;
+        var lines = lineBuf.split('\n');
+        lineBuf = lines.pop();
+        lines.forEach(feedLine);
+      }
+    } catch (e) {
+      log('\n[read error] ' + e.message + '\n');
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  async function disconnect() {
+    keepReading = false;
+    try { if (reader) await reader.cancel(); } catch (e) {}
+    try { if (writer) { writer.releaseLock(); writer = null; } } catch (e) {}
+    try { if (port) await port.close(); } catch (e) {}
+    port = null;
+    connectBtn.disabled = false;
+    disconnectBtn.disabled = true;
+    sendBtn.disabled = true;
+  }
+  disconnectBtn.onclick = disconnect;
+  window.addEventListener('beforeunload', function () { if (port) disconnect(); });
+
+  form.onsubmit = async function (e) {
+    e.preventDefault();
+    if (!writer) return;
+    var fd = new FormData(form);
+    var body = {};
+    ['wifi_ssid', 'wifi_pass', 'device_pin', 'openrouter_key', 'gemini_key', 'ai_provider']
+      .forEach(function (k) { var v = fd.get(k); if (v) body[k] = v; });
+    if (!body.wifi_ssid) { status('bad', 'Wi-Fi SSID is required.'); return; }
+    var tz = fd.get('tz_offset_min');
+    if (tz !== '' && tz != null) body.tz_offset_min = Number(tz);
+
+    var line = JSON.stringify(body) + '\n';
+    try {
+      await writer.write(new TextEncoder().encode(line));
+      status('wait', 'Sent — waiting for the device to confirm...');
+    } catch (e) {
+      status('bad', 'Send failed: ' + e.message);
+    }
+  };
+})();
+</script>

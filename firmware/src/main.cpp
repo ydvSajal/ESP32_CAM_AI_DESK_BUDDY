@@ -4,6 +4,7 @@
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <esp_task_wdt.h>
+#include <ArduinoJson.h>
 
 #include "config.h"
 #include "storage.h"
@@ -15,6 +16,33 @@
 #include "display.h"
 
 static TaskHandle_t hCam = nullptr, hSd = nullptr;
+
+// USB-serial alternative to the SoftAP captive portal: the flashing web page (webflash/)
+// can send one JSON line over the same port it just flashed through, no second Wi-Fi
+// network to join. Markers are grep-able on purpose so a browser-side reader can parse
+// them without guessing at prose.
+static bool trySerialProvision() {
+  Serial.println(">>>PROVISION_READY");
+  Serial.setTimeout(SERIAL_PROVISION_WINDOW_MS);
+  String line = Serial.readStringUntil('\n');
+  line.trim();
+  if (line.length() == 0) { Serial.println(">>>PROVISION_TIMEOUT"); return false; }
+
+  JsonDocument doc;
+  DeserializationError je = deserializeJson(doc, line);
+  if (je || !doc.is<JsonObject>()) {
+    Serial.println(">>>PROVISION_ERR:invalid JSON");
+    return false;
+  }
+  String saved, errMsg;
+  bool rebootReq = false;
+  if (!settingsApplyJson(doc.as<JsonObject>(), true, saved, rebootReq, errMsg)) {
+    Serial.println(">>>PROVISION_ERR:" + errMsg);
+    return false;
+  }
+  Serial.println(">>>PROVISION_OK");
+  return true;
+}
 
 static void startSetupMode() {
   WiFi.mode(WIFI_AP);
@@ -46,6 +74,9 @@ void setup() {
   Serial.println("\n[boot] deskbuddy");
 
   settingsLoad();
+  if (!settingsValid() && trySerialProvision()) {
+    // saved to NVS, settingsValid() now true — fall straight into station mode below
+  }
   if (!settingsValid()) startSetupMode();
   else                  startStationMode();
 

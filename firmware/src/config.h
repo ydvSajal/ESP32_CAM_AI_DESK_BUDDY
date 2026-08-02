@@ -131,6 +131,10 @@
 #define NTP_SERVER         "pool.ntp.org"
 #define MDNS_HOST          "deskbuddy"
 
+// How long setup() waits, USB-connected, for a provisioning line on Serial before
+// falling back to the SoftAP captive portal. Only runs when NVS has no Wi-Fi creds yet.
+#define SERIAL_PROVISION_WINDOW_MS 20000
+
 // ---------- Feature flags ----------
 #define ENABLE_AUDIO   0    // companion .wav per segment (v1: off until mic verified)
 #define ENABLE_UPLOAD  1    // Google Drive resumable upload

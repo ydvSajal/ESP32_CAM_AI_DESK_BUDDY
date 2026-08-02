@@ -65,3 +65,74 @@ String maskSecret(const String& s) {
   if (keep) out += s.substring(n - keep);
   return out;
 }
+
+static bool videoGeometryOk(int w, int h) {
+  return (w == 320 && h == 240) || (w == 640 && h == 480) || (w == 800 && h == 600) ||
+         (w == 1024 && h == 768) || (w == 1600 && h == 1200);
+}
+
+// docs/API.md 3.8: partial update, validate everything first, write nothing on failure.
+bool settingsApplyJson(JsonObject o, bool requireSsid, String& savedCsv,
+                        bool& rebootRequired, String& errMsg) {
+  if (requireSsid && !o["wifi_ssid"].is<const char*>()) { errMsg = "wifi_ssid required"; return false; }
+#define BAD(m) { errMsg = m; return false; }
+  if (o["wifi_ssid"].is<const char*>() && String(o["wifi_ssid"].as<const char*>()).length() > 32) BAD("wifi_ssid too long")
+  if (o["wifi_pass"].is<const char*>() && String(o["wifi_pass"].as<const char*>()).length() > 63) BAD("wifi_pass too long")
+  if (o["device_pin"].is<const char*>()) {
+    size_t n = strlen(o["device_pin"].as<const char*>());
+    if (n != 0 && (n < 4 || n > 12)) BAD("device_pin must be empty or 4-12 chars")
+  }
+  if (o["ai_provider"].is<const char*>()) {
+    String p = o["ai_provider"].as<const char*>();
+    if (p != "openrouter" && p != "gemini") BAD("ai_provider must be openrouter or gemini")
+  }
+  if (o["video"].is<JsonObject>()) {
+    JsonObject v = o["video"];
+    int w = v["width"] | (int)settings.videoWidth, h = v["height"] | (int)settings.videoHeight;
+    int fps = v["fps"] | (int)settings.videoFps, q = v["quality"] | (int)settings.videoQuality;
+    if (!videoGeometryOk(w, h)) BAD("unsupported video geometry")
+    if (fps < 1 || fps > 20) BAD("video.fps must be 1-20")
+    if (q < 10 || q > 63) BAD("video.quality must be 10-63")
+  }
+  if (o["tz_offset_min"].is<int>()) {
+    int t = o["tz_offset_min"];
+    if (t < -720 || t > 840) BAD("tz_offset_min out of range")
+  }
+#undef BAD
+
+  String saved;
+  rebootRequired = false;
+#define TAKE(key, field) if (o[key].is<const char*>()) { \
+    String nv = o[key].as<const char*>(); if (nv != field) { field = nv; } \
+    saved += (saved.length() ? ",\"" : "\""); saved += key; saved += "\""; }
+
+  TAKE("wifi_ssid", settings.wifiSsid)          if (o["wifi_ssid"].is<const char*>()) rebootRequired = true;
+  TAKE("wifi_pass", settings.wifiPass)          if (o["wifi_pass"].is<const char*>()) rebootRequired = true;
+  TAKE("device_pin", settings.devicePin)
+  TAKE("openrouter_key", settings.openrouterKey)
+  TAKE("gemini_key", settings.geminiKey)
+  TAKE("drive_refresh_token", settings.driveRefreshToken)
+  TAKE("drive_client_id", settings.driveClientId)
+  TAKE("drive_client_secret", settings.driveClientSecret)
+  TAKE("drive_folder_id", settings.driveFolderId)
+  TAKE("ai_provider", settings.aiProvider)
+#undef TAKE
+
+  if (o["video"].is<JsonObject>()) {
+    JsonObject v = o["video"];
+    settings.videoWidth = v["width"] | settings.videoWidth;
+    settings.videoHeight = v["height"] | settings.videoHeight;
+    settings.videoFps = v["fps"] | settings.videoFps;
+    settings.videoQuality = v["quality"] | settings.videoQuality;
+    saved += (saved.length() ? ",\"video\"" : "\"video\"");
+    rebootRequired = true;
+  }
+  if (o["tz_offset_min"].is<int>()) {
+    settings.tzOffsetMin = o["tz_offset_min"].as<int>();
+    saved += (saved.length() ? ",\"tz_offset_min\"" : "\"tz_offset_min\"");
+  }
+
+  settingsSave();
+  savedCsv = saved;
+  return true;
+}

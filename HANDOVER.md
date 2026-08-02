@@ -239,3 +239,27 @@ point — they were not.
 Section 11 is still open and still needs the user: board confirmation, display model, GCP
 project, target video res/fps. Flashing and every hardware-dependent T-row in TEST_PLAN.md are
 still outstanding — they need the physical board.
+
+### Addendum: browser flashing + USB provisioning (2026-08-02)
+
+`webflash/` is a static page (deployable to Vercel) using `esp-web-tools` (Web Serial, Chrome/Edge
+only) to flash `bootloader.bin` + `partitions.bin` + `boot_app0.bin` + `firmware.bin` +
+`littlefs.bin` in one pass — no PlatformIO CLI needed. `.gitignore`'s `*.bin` rule is carved out
+for that one directory since shipping the binaries is the point.
+
+The page also opens its own Web Serial connection (separate from esp-web-tools' internal one) to
+send Wi-Fi/PIN/AI-key setup over the same USB cable, replacing the SoftAP hop for first boot. This
+needed a real firmware change, not just a page: the validate-and-save logic that used to live only
+in `webserver.cpp`'s `applySettings()` moved to `storage.cpp` as `settingsApplyJson(JsonObject,
+requireSsid, ...)`, and `main.cpp` gained `trySerialProvision()` — before falling back to the
+SoftAP, `setup()` waits `SERIAL_PROVISION_WINDOW_MS` (20 s, `config.h`) for one JSON line on
+Serial, terminated `\n`, and replies with `>>>PROVISION_OK` / `>>>PROVISION_ERR:<reason>` /
+`>>>PROVISION_TIMEOUT`. `docs/SETUP.md` §3 documents both paths. `webserver.cpp`'s HTTP handler is
+now a thin wrapper around the same function — one validator, not two.
+
+Reverified after the refactor: full `pio run -e seeed_xiao_esp32s3` compile still succeeds
+(RAM/Flash usage essentially unchanged). No native test covers `settingsApplyJson()` directly —
+it lives in `storage.cpp`, which pulls in real `Preferences.h`/`Arduino.h` and isn't part of the
+native-testable pure-logic split (`rec_pure.h`'s pattern). The real-target compile is the runnable
+check for this one; a native stub would be new scaffolding for a function that's a straight move
+of already-shipped, already-tested logic.
