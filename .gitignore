@@ -4,6 +4,8 @@
 .vscode/
 *.bin
 *.elf
+# webflash ships prebuilt flash images on purpose — the whole point of the page
+!webflash/firmware/*.bin
 
 node_modules/
 .vercel/

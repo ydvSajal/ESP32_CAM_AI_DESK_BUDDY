@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flash Desk Buddy</title>
+<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js"></script>
+<style>
+  body{font:16px/1.5 system-ui;margin:0;padding:0;background:#0f1115;color:#e8e8e8}
+  main{max-width:640px;margin:0 auto;padding:48px 24px}
+  h1{font-size:22px;margin:0 0 4px}
+  p.sub{color:#9ca3af;margin-top:0}
+  .card{background:#1a1d24;border:1px solid #2a2e38;border-radius:12px;padding:24px;margin:20px 0}
+  esp-web-install-button{display:block}
+  esp-web-install-button button{
+    width:100%;padding:16px;font:600 16px system-ui;background:#3b82f6;color:#fff;
+    border:0;border-radius:8px;cursor:pointer}
+  esp-web-install-button button:hover{background:#2563eb}
+  ol{padding-left:20px;color:#c7c9d1}
+  li{margin:6px 0}
+  code{background:#2a2e38;padding:2px 6px;border-radius:4px;font-size:14px}
+  .warn{color:#f59e0b;font-size:14px;margin-top:16px}
+  .support{font-size:13px;color:#6b7280;margin-top:8px}
+  a{color:#60a5fa}
+  footer{color:#6b7280;font-size:13px;margin-top:32px}
+</style>
+<main>
+  <h1>Flash Desk Buddy</h1>
+  <p class="sub">ESP32-S3 firmware + web app, straight from this page. No PlatformIO, no CLI.</p>
+
+  <div class="card">
+    <ol>
+      <li>Plug the board in over USB-C.</li>
+      <li>Click install below, pick the serial port when Chrome asks.</li>
+      <li>If it doesn't show up: hold <b>BOOT</b>, tap <b>RESET</b>, release <b>BOOT</b> — then retry.</li>
+      <li>Takes about a minute. Firmware and the PWA both flash in this one pass.</li>
+    </ol>
+    <esp-web-install-button manifest="manifest.json"></esp-web-install-button>
+    <p class="support">Works in Chrome / Edge on desktop (Web Serial API). Not Firefox, not Safari, not mobile.</p>
+  </div>
+
+  <p class="warn">First boot: join the <code>deskbuddy-setup</code> Wi-Fi network from your phone,
+    open <code>http://192.168.4.1</code>, and enter your Wi-Fi + a device PIN. The device reboots
+    and shows its URL on its own screen from then on.</p>
+
+  <footer>Source: <a href="https://github.com/ydvSajal/ESP32_CAM_AI_DESK_BUDDY" target="_blank" rel="noopener">ESP32_CAM_AI_DESK_BUDDY</a></footer>
+</main>
