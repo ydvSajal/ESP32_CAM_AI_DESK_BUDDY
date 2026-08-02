@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desk Buddy — app.js unit tests</title>
+<style>
+ body { font: 15px/1.5 system-ui, sans-serif; background: #0e1116; color: #e6e9ee; margin: 1rem; }
+ li { font-family: ui-monospace, monospace; }
+ .pass { color: #3ddc84; } .fail { color: #ff6b6b; font-weight: 700; }
+ #summary { font-size: 1.2rem; padding: .5rem 0; }
+</style>
+</head>
+<body>
+<h1>app.js pure-function tests</h1>
+<p>Open directly (file://) or via the mock server at <code>/test/webapp/test.html</code>.</p>
+<p id="summary">running…</p>
+<ol id="out"></ol>
+
+<script src="../../webapp/app.js"></script>
+<script>
+var pass = 0, fail = 0;
+function log(ok, name, extra) {
+  pass += ok ? 1 : 0; fail += ok ? 0 : 1;
+  var li = document.createElement('li');
+  li.className = ok ? 'pass' : 'fail';
+  li.textContent = (ok ? 'PASS ' : 'FAIL ') + name + (ok || !extra ? '' : ' — ' + extra);
+  document.getElementById('out').appendChild(li);
+}
+function eq(a, b, name) {
+  var x = JSON.stringify(a), y = JSON.stringify(b);
+  log(x === y, name, 'got ' + x + ', want ' + y);
+}
+
+/* --- device URL building / normalization --- */
+eq(DB.normalizeBase('192.168.1.42'), 'http://192.168.1.42', 'normalizeBase bare IP');
+eq(DB.normalizeBase(' deskbuddy.local/ '), 'http://deskbuddy.local', 'normalizeBase mDNS + slash + spaces');
+eq(DB.normalizeBase('http://10.0.0.5:8080/x/y'), 'http://10.0.0.5:8080', 'normalizeBase keeps port, drops path');
+eq(DB.normalizeBase('https://dev.lan'), 'https://dev.lan', 'normalizeBase keeps https');
+eq(DB.normalizeBase(''), '', 'normalizeBase empty');
+eq(DB.normalizeBase(null), '', 'normalizeBase null');
+eq(DB.normalizeBase('http://'), '', 'normalizeBase no host');
+eq(DB.wsUrl('192.168.1.42', '482913'), 'ws://192.168.1.42/ws?pin=482913', 'wsUrl with pin');
+eq(DB.wsUrl('192.168.1.42', ''), 'ws://192.168.1.42/ws', 'wsUrl without pin');
+eq(DB.wsUrl('https://dev.lan', 'a b'), 'wss://dev.lan/ws?pin=a%20b', 'wsUrl wss + encoding');
+eq(DB.wsUrl('', 'x'), '', 'wsUrl no base');
+eq(DB.apiUrl('1.2.3.4', '/api/status'), 'http://1.2.3.4/api/status', 'apiUrl plain');
+eq(DB.apiUrl('1.2.3.4', '/api/recordings', { day: '20260802', limit: '' }),
+   'http://1.2.3.4/api/recordings?day=20260802', 'apiUrl drops empty params');
+eq(DB.apiUrl('1.2.3.4', '/api/recordings/file', { path: '/rec/20260802/003000.avi' }),
+   'http://1.2.3.4/api/recordings/file?path=%2Frec%2F20260802%2F003000.avi', 'apiUrl encodes path param');
+
+/* --- formatting --- */
+eq(DB.fmtBytes(0), '0 B', 'fmtBytes 0');
+eq(DB.fmtBytes(1023), '1023 B', 'fmtBytes <1K');
+eq(DB.fmtBytes(1024), '1.0 KB', 'fmtBytes 1K');
+eq(DB.fmtBytes(142384), '139.0 KB', 'fmtBytes heap');
+eq(DB.fmtBytes(3612884992), '3.4 GB', 'fmtBytes GB');
+eq(DB.fmtBytes(-1), '–', 'fmtBytes negative');
+eq(DB.fmtBytes(undefined), '–', 'fmtBytes undefined');
+eq(DB.fmtMB(40617), '39.7 GB', 'fmtMB');
+eq(DB.fmtUptime(0), '0s', 'fmtUptime 0');
+eq(DB.fmtUptime(59), '59s', 'fmtUptime seconds');
+eq(DB.fmtUptime(142), '2m 22s', 'fmtUptime minutes');
+eq(DB.fmtUptime(3671), '1h 1m', 'fmtUptime hours');
+eq(DB.fmtUptime(84213), '23h 23m', 'fmtUptime <1d');
+eq(DB.fmtUptime(90061), '1d 1h 1m', 'fmtUptime days');
+eq(DB.fmtUptime(null), '–', 'fmtUptime null');
+// The epoch/ISO pair from API.md 3.1, now corrected there so the two agree.
+eq(DB.fmtDeviceTime(1785631200, 0), '2026-08-02 00:40:00 (UTC+0)', 'fmtDeviceTime UTC');
+eq(DB.fmtDeviceTime(1785631200, 330), '2026-08-02 06:10:00 (UTC+5)', 'fmtDeviceTime +05:30');
+eq(DB.fmtDeviceTime(null, 0), '–', 'fmtDeviceTime null');
+
+/* --- partial settings diff (API.md 3.8) --- */
+var ORIG = { wifi_ssid: 'home-2g', wifi_pass: '********word', device_pin: '******',
+  openrouter_key: '********3456', gemini_key: '', drive_refresh_token: '********mNo1',
+  drive_client_id: '8123-abc.apps.googleusercontent.com', drive_client_secret: '********xY7q',
+  drive_folder_id: '1AbCdEfGhIjKlMnOp', ai_provider: 'openrouter',
+  video: { width: 800, height: 600, fps: 10, quality: 12 }, tz_offset_min: 330 };
+function form(over) {
+  var f = {}; Object.keys(ORIG).forEach(function (k) { f[k] = ORIG[k]; });
+  f.video = { width: 800, height: 600, fps: 10, quality: 12 };
+  Object.keys(over || {}).forEach(function (k) { f[k] = over[k]; });
+  return f;
+}
+eq(DB.diffSettings(form(), ORIG), {}, 'diff: untouched form sends nothing');
+eq(DB.diffSettings(form({ openrouter_key: 'sk-or-v1-NEWKEY' }), ORIG),
+   { openrouter_key: 'sk-or-v1-NEWKEY' }, 'diff: new secret sent in full');
+eq(DB.diffSettings(form({ openrouter_key: '' }), ORIG),
+   { openrouter_key: '' }, 'diff: cleared secret sent as "" (clear)');
+eq(DB.diffSettings(form({ gemini_key: '' }), ORIG), {}, 'diff: still-empty secret not sent');
+eq(DB.diffSettings(form({ gemini_key: 'AIza-x' }), ORIG),
+   { gemini_key: 'AIza-x' }, 'diff: newly filled empty secret sent');
+eq(DB.diffSettings(form({ ai_provider: 'gemini' }), ORIG), { ai_provider: 'gemini' }, 'diff: plain field change');
+eq(DB.diffSettings(form({ tz_offset_min: '330' }), ORIG), {}, 'diff: numeric string equal to number = unchanged');
+eq(DB.diffSettings(form({ tz_offset_min: '-480' }), ORIG), { tz_offset_min: -480 }, 'diff: tz sent as number');
+eq(DB.diffSettings(form({ video: { width: 640, height: 480, fps: 10, quality: 12 } }), ORIG),
+   { video: { width: 640, height: 480, fps: 10, quality: 12 } }, 'diff: video sent whole when any part changes');
+eq(DB.diffSettings(form({ video: { width: '800', height: '600', fps: '10', quality: '12' } }), ORIG),
+   {}, 'diff: video unchanged despite string types');
+eq(DB.diffSettings(form({ wifi_pass: 'newpass', ai_provider: 'gemini' }), ORIG),
+   { wifi_pass: 'newpass', ai_provider: 'gemini' }, 'diff: two edits, nothing else');
+eq(DB.diffSettings(form({ device_pin: '' }), ORIG), { device_pin: '' }, 'diff: PIN can be cleared (auth off)');
+eq(Object.keys(DB.diffSettings(form(), {})).length > 0, true, 'diff: empty original = everything is a change');
+
+/* --- backoff schedule --- */
+eq([0,1,2,3,4,5,6,10].map(DB.backoffMs), [1000,2000,4000,8000,16000,30000,30000,30000], 'backoff 1s..30s cap');
+
+/* --- WS dispatch (API.md 4) --- */
+(function () {
+  var got = [];
+  var h = { status: function (p) { got.push(['status', p.uptime_s]); },
+            ai_chunk: function (p) { got.push(['chunk', p.text]); } };
+  eq(DB.dispatchWs('{"type":"status","ts":1,"payload":{"uptime_s":42}}', h), 'status', 'dispatch status');
+  eq(DB.dispatchWs({ type: 'ai_chunk', ts: 1, payload: { text: 'hi' } }, h), 'ai_chunk', 'dispatch object form');
+  eq(DB.dispatchWs('{"type":"upload_event","ts":1,"payload":{}}', h), null, 'dispatch unknown type ignored');
+  eq(DB.dispatchWs('not json', h), null, 'dispatch bad json ignored');
+  eq(DB.dispatchWs('{"ts":1}', h), null, 'dispatch missing type ignored');
+  eq(DB.dispatchWs(null, h), null, 'dispatch null ignored');
+  eq(got, [['status', 42], ['chunk', 'hi']], 'dispatch called the right handlers only');
+  var calls = 0;
+  DB.dispatchWs('{"type":"status"}', { status: function (p) { calls++; eq(p, {}, 'dispatch missing payload -> {}'); } });
+  eq(calls, 1, 'dispatch handler ran once');
+})();
+
+/* The MJPEG multipart parser is gone: /api/stream takes ?pin= now (API.md 3.3), so
+   the browser decodes the stream in a plain <img src>. These URL builders are what
+   the Live tab and the Download link are now made of — they carry the auth. */
+eq(DB.apiUrl('1.2.3.4', '/api/stream', { pin: '482913', t: 1 }),
+   'http://1.2.3.4/api/stream?pin=482913&t=1', 'stream URL carries the pin');
+eq(DB.apiUrl('1.2.3.4', '/api/stream', { pin: '', t: 1 }),
+   'http://1.2.3.4/api/stream?t=1', 'stream URL omits an empty pin');
+eq(DB.apiUrl('1.2.3.4', '/api/recordings/file', { path: '/rec/20260802/003000.avi', pin: 'a b' }),
+   'http://1.2.3.4/api/recordings/file?path=%2Frec%2F20260802%2F003000.avi&pin=a%20b',
+   'download URL encodes path and pin');
+
+/* --- error text: never a stack trace --- */
+eq(DB.errText({ status: 401 }), 'Wrong or missing device PIN.', 'errText 401');
+eq(DB.errText({ status: 409, message: 'stream already in use' }), 'stream already in use', 'errText 409');
+eq(DB.errText({ status: 503, message: 'camera not ready' }), 'camera not ready', 'errText 503');
+eq(DB.errText({}), 'Device unreachable — check the address and that you are on the same Wi-Fi.', 'errText network');
+log(DB.errText(new TypeError('x is not a function')).indexOf('not a function') === -1,
+    'errText hides raw JS errors');
+
+document.getElementById('summary').textContent = fail === 0
+  ? 'ALL ' + pass + ' TESTS PASSED' : fail + ' FAILED, ' + pass + ' passed';
+document.getElementById('summary').className = fail === 0 ? 'pass' : 'fail';
+document.title = (fail === 0 ? 'PASS' : 'FAIL') + ' — app.js tests';
+window.__RESULT = { pass: pass, fail: fail };
+</script>
+</body>
+</html>

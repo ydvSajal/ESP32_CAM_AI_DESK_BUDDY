@@ -1,0 +1,19 @@
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+*.bin
+*.elf
+
+node_modules/
+.vercel/
+
+# secrets live in NVS, never in the repo
+.env
+.env.*
+*secret*
+*credentials*.json
+token.json
+
+.DS_Store
+Thumbs.db

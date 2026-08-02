@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Desk Buddy</title>
+<meta name="theme-color" content="#0e1116">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>Desk&nbsp;Buddy</h1>
+  <p id="conn" class="pill pill-bad" role="status" aria-live="polite">disconnected</p>
+  <button id="btn-device" aria-expanded="false" aria-controls="devicebar">Device</button>
+</header>
+
+<form id="devicebar" hidden>
+  <p>
+    <label for="f-addr">Device address (IP or mDNS name)</label>
+    <input id="f-addr" name="addr" inputmode="url" autocomplete="off" placeholder="192.168.1.42 or deskbuddy.local">
+  </p>
+  <p>
+    <label for="f-pin">Device PIN <span class="hint">(blank if the device has none)</span></label>
+    <input id="f-pin" name="pin" type="password" inputmode="numeric" autocomplete="off">
+  </p>
+  <p><button type="submit">Connect</button> <button type="button" id="btn-forget">Forget</button></p>
+</form>
+
+<nav aria-label="Sections">
+  <button class="tab" data-tab="status" aria-current="page">Status</button>
+  <button class="tab" data-tab="live">Live</button>
+  <button class="tab" data-tab="ai">AI</button>
+  <button class="tab" data-tab="rec">Recordings</button>
+  <button class="tab" data-tab="settings">Settings</button>
+</nav>
+
+<p id="banner" class="banner" hidden role="alert"></p>
+
+<main>
+
+<section id="tab-status" aria-labelledby="h-status">
+  <h2 id="h-status">Status</h2>
+  <dl class="grid">
+    <dt>Connection</dt><dd id="s-link">–</dd>
+    <dt>Uptime</dt><dd id="s-uptime">–</dd>
+    <dt>Free heap</dt><dd id="s-heap">–</dd>
+    <dt>Free PSRAM</dt><dd id="s-psram">–</dd>
+    <dt>Recording</dt><dd id="s-rec">–</dd>
+    <dt>Upload queue</dt><dd id="s-queue">–</dd>
+    <dt>Wi-Fi</dt><dd id="s-wifi">–</dd>
+    <dt>Device time</dt><dd id="s-time">–</dd>
+    <dt>Firmware</dt><dd id="s-fw">–</dd>
+  </dl>
+  <p><label for="s-sd">SD card</label></p>
+  <progress id="s-sd" max="100" value="0"></progress>
+  <p id="s-sdtext" class="hint">–</p>
+</section>
+
+<section id="tab-live" aria-labelledby="h-live" hidden>
+  <h2 id="h-live">Live</h2>
+  <p>
+    <button id="btn-snap">Take snapshot</button>
+    <button id="btn-stream" aria-pressed="false">Start stream</button>
+  </p>
+  <p id="live-msg" class="hint" role="status" aria-live="polite"></p>
+  <img id="live-img" alt="Latest camera frame" hidden>
+</section>
+
+<section id="tab-ai" aria-labelledby="h-ai" hidden>
+  <h2 id="h-ai">AI assistant</h2>
+  <form id="ai-form">
+    <p>
+      <label for="ai-provider">Provider</label>
+      <select id="ai-provider" name="provider">
+        <option value="openrouter">OpenRouter</option>
+        <option value="gemini">Gemini</option>
+      </select>
+    </p>
+    <p>
+      <label for="ai-prompt">Prompt</label>
+      <textarea id="ai-prompt" name="prompt" rows="3" maxlength="2000" required></textarea>
+    </p>
+    <p><button type="submit" id="ai-send">Ask</button></p>
+  </form>
+  <output id="ai-answer" for="ai-prompt" aria-live="polite"></output>
+</section>
+
+<section id="tab-rec" aria-labelledby="h-rec" hidden>
+  <h2 id="h-rec">Recordings</h2>
+  <p><button id="btn-days">Refresh days</button> <span id="rec-free" class="hint"></span></p>
+  <ul id="rec-days" class="list"></ul>
+  <h3 id="rec-dayhead" hidden>Segments</h3>
+  <ul id="rec-segs" class="list"></ul>
+</section>
+
+<section id="tab-settings" aria-labelledby="h-settings" hidden>
+  <h2 id="h-settings">Settings</h2>
+  <p class="hint">Secrets load <strong>masked</strong> (e.g. <code>********3456</code>). Leave a field
+    untouched to keep it. Type a new value to replace it. Clear it to erase it on the device.
+    Only fields you actually change are sent.</p>
+  <form id="set-form">
+    <p><label for="set-wifi_ssid">Wi-Fi SSID</label><input id="set-wifi_ssid" name="wifi_ssid" maxlength="32" autocomplete="off"></p>
+    <p><label for="set-wifi_pass">Wi-Fi password</label><input id="set-wifi_pass" name="wifi_pass" maxlength="63" autocomplete="off"></p>
+    <p><label for="set-device_pin">Device PIN <span class="hint">(4–12 chars, or empty to disable auth)</span></label><input id="set-device_pin" name="device_pin" maxlength="12" autocomplete="off"></p>
+    <p><label for="set-openrouter_key">OpenRouter API key</label><input id="set-openrouter_key" name="openrouter_key" autocomplete="off"></p>
+    <p><label for="set-gemini_key">Gemini API key</label><input id="set-gemini_key" name="gemini_key" autocomplete="off"></p>
+    <p><label for="set-ai_provider">AI provider</label>
+      <select id="set-ai_provider" name="ai_provider">
+        <option value="openrouter">OpenRouter</option><option value="gemini">Gemini</option>
+      </select></p>
+    <p><label for="set-drive_client_id">Drive client ID</label><input id="set-drive_client_id" name="drive_client_id" autocomplete="off"></p>
+    <p><label for="set-drive_client_secret">Drive client secret</label><input id="set-drive_client_secret" name="drive_client_secret" autocomplete="off"></p>
+    <p><label for="set-drive_refresh_token">Drive refresh token</label><input id="set-drive_refresh_token" name="drive_refresh_token" autocomplete="off"></p>
+    <p><label for="set-drive_folder_id">Drive folder ID</label><input id="set-drive_folder_id" name="drive_folder_id" autocomplete="off"></p>
+    <fieldset>
+      <legend>Video</legend>
+      <p><label for="set-video_size">Resolution</label>
+        <select id="set-video_size" name="video_size">
+          <option value="320x240">320x240</option><option value="640x480">640x480</option>
+          <option value="800x600">800x600</option><option value="1024x768">1024x768</option>
+          <option value="1600x1200">1600x1200</option>
+        </select></p>
+      <p><label for="set-video_fps">FPS (1–20)</label><input id="set-video_fps" name="video_fps" type="number" min="1" max="20"></p>
+      <p><label for="set-video_quality">JPEG quality (10–63, lower = better)</label><input id="set-video_quality" name="video_quality" type="number" min="10" max="63"></p>
+    </fieldset>
+    <p><label for="set-tz_offset_min">Timezone offset (minutes from UTC, -720…840)</label><input id="set-tz_offset_min" name="tz_offset_min" type="number" min="-720" max="840"></p>
+    <p><button type="submit">Save changes</button> <button type="button" id="btn-reload">Reload from device</button></p>
+  </form>
+  <p id="set-msg" class="hint" role="status" aria-live="polite"></p>
+  <p><button id="btn-reboot" class="danger">Reboot device</button></p>
+</section>
+
+</main>
+<script src="app.js"></script>
+</body>
+</html>
